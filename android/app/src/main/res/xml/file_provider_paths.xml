@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only the "share" subdirectory of the app cache is exposed via FileProvider.
+  Native code (Phase 2+) must write share-ready outputs (single results and
+  split clips) here, never to the raw cache root, so the rest of the app's
+  private files stay unreachable to other apps.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="share" path="share/" />
+</paths>
