@@ -59,43 +59,41 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_isPickingMedia) return;
     setState(() => _isPickingMedia = true);
 
-    // Shown BEFORE launching the picker, not after. The system picker
-    // occludes it while it's on screen, but the moment the picker
-    // dismisses, this dialog is already sitting in the widget tree and
-    // becomes visible immediately — covering the part of the wait that
-    // happens inside image_picker's native call (copying/downloading the
-    // selected file), which Dart has no other hook into. Showing it only
-    // after `pickMedia()` returns is too late: that gap is exactly what
-    // was reading as "nothing happens."
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const _CheckingFileDialog(),
-    );
+    // Not shown immediately — that flashed on screen during the brief
+    // native activity-launch transition, before the system picker's own
+    // UI had actually appeared. Instead, it's scheduled to appear only if
+    // picking is *still* unresolved after a short buffer, by which point
+    // the picker (if still open) fully occludes it. If the user is still
+    // browsing, this sits hidden behind the picker and only becomes
+    // visible once it dismisses — which also covers the native
+    // copy/download step for a large/cloud file that Dart has no other
+    // hook into, since that happens inside the same unresolved `pickMedia()`
+    // call. If picking finishes faster than the buffer, this never shows.
+    var pickResolved = false;
+    var dialogShown = false;
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (pickResolved || !mounted) return;
+      dialogShown = true;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const _CheckingFileDialog(),
+      );
+    });
 
     void closeCheckingDialog() {
-      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      pickResolved = true;
+      if (dialogShown && mounted) Navigator.of(context, rootNavigator: true).pop();
     }
 
     try {
       final picked = await _picker.pickMedia();
-
-      if (picked == null || !mounted) {
-        closeCheckingDialog();
-        return;
-      }
-
-      // File.length() is a filesystem stat — near-instant for a file
-      // that's already local. The floor delay just keeps this dialog from
-      // being an imperceptible flash on the fast path; it does not add to
-      // the slow path, since Future.wait resolves at max(stat, 300ms).
-      final results = await Future.wait([
-        File(picked.path).length(),
-        Future.delayed(const Duration(milliseconds: 300)),
-      ]);
-      final sizeBytes = results[0] as int;
-
       closeCheckingDialog();
+
+      if (picked == null || !mounted) return;
+
+      // Already local by now (pickMedia() has resolved) — a plain stat.
+      final sizeBytes = await File(picked.path).length();
       if (!mounted) return;
 
       // 1. Absolute hard ceiling — blocks everyone, including Pro.
@@ -347,7 +345,6 @@ class _HomeScreenState extends State<HomeScreen> {
               // 1. Main Action Button ("Choose photo or video")
               PrimaryButton(
                 label: 'Choose photo or video',
-                loading: _isPickingMedia,
                 onPressed: _chooseMedia,
               ),
 

@@ -10,42 +10,25 @@ class PrimaryButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.icon,
-    this.loading = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
 
-  /// Shows a spinner and ignores taps. Set this the instant a long-running
-  /// action starts (e.g. before awaiting image_picker) rather than only
-  /// after it returns — some of that wait happens inside a plugin's native
-  /// call, where Dart has no hook to show anything else, so this button
-  /// being visibly busy is the only feedback available for that stretch.
-  final bool loading;
-
   @override
   Widget build(BuildContext context) {
-    Widget child;
-    if (loading) {
-      child = const SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-      );
-    } else if (icon == null) {
-      child = Text(label);
-    } else {
-      child = Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 8),
-          Text(label),
-        ],
-      );
-    }
+    final child = icon == null
+        ? Text(label)
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20),
+              const SizedBox(width: 8),
+              Text(label),
+            ],
+          );
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
@@ -54,7 +37,7 @@ class PrimaryButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           )
         ),
-        onPressed: loading ? null : onPressed, child: child),
+        onPressed: onPressed, child: child),
     );
   }
 }
