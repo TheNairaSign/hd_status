@@ -5,12 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../channels/whatsapp_status_channel.dart';
+import '../engine/constants.dart';
 import '../services/entitlement_service.dart';
 import '../services/quota_ledger.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import 'paywall_screen.dart';
 import 'selected_media_screen.dart';
+
 
 /// S02 Home screen matching the UX guide design.
 class HomeScreen extends StatefulWidget {
@@ -56,20 +58,119 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _chooseMedia() async {
     if (_isPickingMedia) return;
     setState(() => _isPickingMedia = true);
+
+    // Shown BEFORE launching the picker, not after. The system picker
+    // occludes it while it's on screen, but the moment the picker
+    // dismisses, this dialog is already sitting in the widget tree and
+    // becomes visible immediately — covering the part of the wait that
+    // happens inside image_picker's native call (copying/downloading the
+    // selected file), which Dart has no other hook into. Showing it only
+    // after `pickMedia()` returns is too late: that gap is exactly what
+    // was reading as "nothing happens."
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const _CheckingFileDialog(),
+    );
+
+    void closeCheckingDialog() {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+
     try {
       final picked = await _picker.pickMedia();
-      if (picked == null || !mounted) return;
+
+      if (picked == null || !mounted) {
+        closeCheckingDialog();
+        return;
+      }
+
+      // File.length() is a filesystem stat — near-instant for a file
+      // that's already local. The floor delay just keeps this dialog from
+      // being an imperceptible flash on the fast path; it does not add to
+      // the slow path, since Future.wait resolves at max(stat, 300ms).
+      final results = await Future.wait([
+        File(picked.path).length(),
+        Future.delayed(const Duration(milliseconds: 300)),
+      ]);
+      final sizeBytes = results[0] as int;
+
+      closeCheckingDialog();
+      if (!mounted) return;
+
+      // 1. Absolute hard ceiling — blocks everyone, including Pro.
+      if (sizeBytes > kAbsMaxFileSizeBytes) {
+        final gb = (sizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(1);
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('File too large'),
+            content: Text(
+              'This file is ${gb}GB. HD Status can only prepare files up to 4GB. '
+              'Please choose a shorter clip.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // 2. Free-tier ceiling — offer Pro upgrade if over 2GB.
+      if (sizeBytes > kFreeMaxFileSizeBytes && !_isPro) {
+        final action = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('File over 2GB'),
+            content: const Text(
+              'Free users can only prepare files up to 2GB. '
+              'Upgrade to Pro to prepare larger files.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop('cancel'),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop('pro'),
+                child: const Text('Go Pro'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted) return;
+        if (action == 'pro') {
+          await PaywallScreen.show(context, heading: 'Prepare files over 2GB with Pro');
+          _refreshStatus();
+        }
+        return;
+      }
+
+      // File is within limits — proceed to the analysis screen.
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => SelectedMediaScreen(filePath: picked.path, fileName: picked.name),
         ),
       );
       _refreshStatus();
-    } on PlatformException catch (_) {
-      // Ignore already_active or picker cancellation exceptions gracefully
+    } on PlatformException catch (e) {
+      closeCheckingDialog();
+      // already_active: silently ignore (guard already prevents double-open).
+      // Any other PlatformException is surfaced to the user.
+      if (e.code != 'already_active' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Couldn't open file: ${e.message ?? e.code}")),
+        );
+      }
     } finally {
+      // Belt-and-suspenders: ensure lock is always released even on exception.
       if (mounted) setState(() => _isPickingMedia = false);
     }
+
   }
 
   Future<void> _goPro() async {
@@ -246,6 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // 1. Main Action Button ("Choose photo or video")
               PrimaryButton(
                 label: 'Choose photo or video',
+                loading: _isPickingMedia,
                 onPressed: _chooseMedia,
               ),
 
@@ -417,6 +519,61 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Non-dismissible loading overlay. Shown before the system picker even
+/// opens (see `_chooseMedia`), so it's already visible the instant the
+/// picker dismisses — covering both the native pick/copy/download step
+/// and the subsequent file-size check. Dismissed programmatically before
+/// any follow-up dialog.
+class _CheckingFileDialog extends StatelessWidget {
+  const _CheckingFileDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final palette = context.appPalette;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(strokeWidth: 3),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Processing your file…',
+                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Large files can take a little longer',
+                style: textTheme.bodySmall?.copyWith(color: palette.secondaryText),
+              ),
             ],
           ),
         ),

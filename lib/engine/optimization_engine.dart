@@ -13,7 +13,7 @@ class OptimizationEngine {
 
   EncodingPlan _planImage(MediaInfo info) {
     final longestEdge = _max(info.width ?? 0, info.height ?? 0);
-    final alreadyFits = longestEdge > 0 && longestEdge <= 1920 && info.mimeType == 'image/jpeg';
+    final alreadyFits = longestEdge > 0 && longestEdge <= kImageMaxDimension && info.mimeType == 'image/jpeg';
     if (alreadyFits) {
       return const EncodingPlan(
         action: EncodingAction.passthrough,
@@ -26,8 +26,8 @@ class OptimizationEngine {
     }
     return const EncodingPlan(
       action: EncodingAction.reencode,
-      targetWidth: 1920,
-      targetHeight: 1920,
+      targetWidth: kImageMaxDimension,
+      targetHeight: kImageMaxDimension,
       targetFps: 0,
       targetVideoKbps: 0,
       reason: 'Preparing a smaller file for WhatsApp',

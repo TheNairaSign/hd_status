@@ -17,6 +17,32 @@ const int kMaxSourceSeconds = 30 * 60;
 const int kFreeVideosPerDay = 3;
 const int kFreeClipsPerDay = 5;
 
+/// Largest file a Free user can select at all — confirmed decision, not a
+/// placeholder. Pro has no such ceiling. Binary GB (1024^3), matching how
+/// Android reports file sizes.
+const int kFreeMaxFileSizeBytes = 2 * 1024 * 1024 * 1024;
+
+/// Hard ceiling applied to ALL users (including Pro) to prevent native OOM /
+/// silent crash when MediaMetadataRetriever or VideoEncoder tries to open an
+/// extremely large source (e.g. a full movie). 4 GB is a safe upper bound
+/// — files this large are never going to produce a single WhatsApp Status
+/// clip; at 1200 kbps the encode output of a 30-min video is already ~250 MB.
+const int kAbsMaxFileSizeBytes = 4 * 1024 * 1024 * 1024;
+
+
+/// Longest edge to send for a re-encoded image. NOT the Brief's original
+/// 1920px placeholder — raised after an A/B test (2448x3264/7.9MB source)
+/// showed WhatsApp Status roughly halves whatever long edge you send it,
+/// capped at ~1080px: sending 1920 (halves to 960, under the cap) produced
+/// a smaller final image (720x960) than sending the untouched original
+/// (halves 3264 to 1632, clamped to 1080 -> 810x1080) — our own downscale
+/// was landing the image in a worse WhatsApp output tier than doing
+/// nothing. 2200 halves to 1100, safely clearing the ~1080 cap so our
+/// output gets clamped to WhatsApp's best tier instead of proportionally
+/// halved into a worse one. Based on one test image — re-validate if
+/// WhatsApp's behavior looks different on other sources/devices.
+const int kImageMaxDimension = 2200;
+
 /// Video encode target profile — placeholder MVP values (Product Brief §8-style
 /// starting profile), to be replaced by Phase 10 benchmark results.
 class VideoEncodeProfile {

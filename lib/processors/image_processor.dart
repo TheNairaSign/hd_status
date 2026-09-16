@@ -5,6 +5,8 @@ import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../engine/constants.dart';
+
 /// Downscale, re-encode, strip GPS EXIF, bake in orientation — the pure-Dart
 /// image half of the pipeline (Product Brief: images stay in Dart, video
 /// stays native). Writes into `<cacheDir>/share/`, the one directory exposed
@@ -12,7 +14,7 @@ import 'package:path_provider/path_provider.dart';
 /// where every share-ready output needs to live regardless of which
 /// pipeline produced it.
 class ImageProcessor {
-  Future<String> optimize(String sourcePath, {int maxDimension = 1920, int quality = 95}) async {
+  Future<String> optimize(String sourcePath, {int maxDimension = kImageMaxDimension, int quality = 97}) async {
     // Path is resolved here (needs the path_provider plugin channel, which
     // only works reliably on the root isolate) and handed to the isolate as
     // a plain string — the actual decode/resize/encode below is pure Dart +
@@ -45,10 +47,11 @@ class _ImageJob {
 
 /// Runs on a background isolate via [compute]. Decoding a real phone photo
 /// (often 4000px+) into a raw pixel buffer, then box-filtering it down to
-/// 1920px, is real CPU/memory work — running it synchronously on the UI
-/// isolate froze the app's animations and risked Android's ANR watchdog on
-/// larger sources, which is what looked like a crash. Must be a top-level
-/// function (not a closure) for `compute` to hand it to another isolate.
+/// [_ImageJob.maxDimension], is real CPU/memory work — running it
+/// synchronously on the UI isolate froze the app's animations and risked
+/// Android's ANR watchdog on larger sources, which is what looked like a
+/// crash. Must be a top-level function (not a closure) for `compute` to
+/// hand it to another isolate.
 String _processImage(_ImageJob job) {
   final bytes = File(job.sourcePath).readAsBytesSync();
   final decoded = img.decodeImage(bytes);
@@ -65,10 +68,10 @@ String _processImage(_ImageJob job) {
   final longestEdge = oriented.width > oriented.height ? oriented.width : oriented.height;
   if (longestEdge > job.maxDimension) {
     // `copyResize`'s default interpolation is nearest-neighbor, which
-    // aliases badly on a >2x downscale (a typical 12MP photo is ~4000px
-    // going to 1920px) — visibly worse than letting WhatsApp's own resize
-    // run on the untouched original. `average` box-filters source pixel
-    // blocks, the standard choice for significant downscaling.
+    // aliases badly on a significant downscale — visibly worse than
+    // letting WhatsApp's own resize run on the untouched original.
+    // `average` box-filters source pixel blocks, the standard choice for
+    // significant downscaling.
     oriented = oriented.width >= oriented.height
         ? img.copyResize(oriented, width: job.maxDimension, interpolation: img.Interpolation.average)
         : img.copyResize(oriented, height: job.maxDimension, interpolation: img.Interpolation.average);

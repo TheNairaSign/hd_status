@@ -3,10 +3,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../channels/media_probe_channel.dart';
+import '../engine/constants.dart';
 import '../engine/optimization_engine.dart';
 import '../models/encoding_plan.dart';
 import '../models/media_info.dart';
 import '../models/share_output.dart';
+import '../services/entitlement_service.dart';
 import '../services/quota_ledger.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
@@ -36,6 +38,7 @@ class _SelectedMediaScreenState extends State<SelectedMediaScreen> {
   MediaInfo? _info;
   EncodingPlan? _plan;
   String? _errorMessage;
+  bool _needsProForSize = false;
   bool _navigatingToLongVideo = false;
 
   @override
@@ -46,10 +49,57 @@ class _SelectedMediaScreenState extends State<SelectedMediaScreen> {
 
   Future<void> _analyze() async {
     try {
-      final info = await _probeChannel.probe(widget.filePath, widget.fileName);
+      final sizeBytes = await File(widget.filePath).length();
+
+      // Absolute hard ceiling — applies to everyone, including Pro.
+      // Files above this will OOM or hang MediaMetadataRetriever / VideoEncoder;
+      // we reject them before even opening the native probe.
+      if (sizeBytes > kAbsMaxFileSizeBytes) {
+        final gb = (sizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(1);
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'This file is ${gb}GB — too large for HD Status to prepare. '
+                'Please choose a shorter clip (under 30 min).';
+          });
+        }
+        return;
+      }
+
+      // Free-tier ceiling — Pro users skip this gate.
+      if (sizeBytes > kFreeMaxFileSizeBytes) {
+        final isPro = await EntitlementService().isPro();
+        if (!isPro) {
+          if (mounted) setState(() => _needsProForSize = true);
+          return;
+        }
+      }
+
+      final MediaInfo info;
+      try {
+        info = await _probeChannel.probe(widget.filePath, widget.fileName);
+      } on MediaProbeException catch (e) {
+        // Native probe failed (unsupported codec, corrupt file, etc.)
+        if (mounted) {
+          setState(() {
+            _errorMessage = "We can't read this file: ${e.message}";
+          });
+        }
+        return;
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _errorMessage = "We can't prepare this file. Try a different format.";
+          });
+        }
+        return;
+      }
 
       if (info.exceedsMaxSourceDuration) {
-        if (mounted) setState(() => _errorMessage = 'This video is longer than we can prepare yet.');
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'This video is longer than 30 minutes. Please choose a shorter clip.';
+          });
+        }
         return;
       }
 
@@ -70,7 +120,11 @@ class _SelectedMediaScreenState extends State<SelectedMediaScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _errorMessage = "We can't prepare this file.");
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Something went wrong. Please try a different file.';
+        });
+      }
     }
   }
 
@@ -116,10 +170,55 @@ class _SelectedMediaScreenState extends State<SelectedMediaScreen> {
     );
   }
 
+  Future<void> _goProForSize() async {
+    final unlocked = await PaywallScreen.show(context, heading: 'Prepare files over 2GB with Pro');
+    if (!mounted) return;
+    if (unlocked == true) {
+      // Preserve the selection and retry analysis now that the cap no
+      // longer applies, per the Brief's "preserve selected media after
+      // purchase" rule — no need to make the user re-pick the file.
+      setState(() => _needsProForSize = false);
+      _analyze();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.appPalette;
     final textTheme = Theme.of(context).textTheme;
+
+    if (_needsProForSize) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Selected media')),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.screenPadding),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.lock_outline, size: 40, color: palette.secondaryText),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'Files over 2GB need Pro',
+                  textAlign: TextAlign.center,
+                  style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  "This file is larger than the free limit. Upgrade to Pro to prepare it, or choose a smaller file.",
+                  textAlign: TextAlign.center,
+                  style: textTheme.bodyMedium?.copyWith(color: palette.secondaryText),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                PrimaryButton(label: 'Go Pro', onPressed: _goProForSize),
+                const SizedBox(height: AppSpacing.sm),
+                SecondaryButton(label: 'Choose another', onPressed: () => Navigator.of(context).pop()),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     if (_errorMessage != null) {
       return Scaffold(
@@ -148,7 +247,19 @@ class _SelectedMediaScreenState extends State<SelectedMediaScreen> {
     if (info == null || plan == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Selected media')),
-        body: Center(child: Text('Checking your file…', style: textTheme.bodyLarge)),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              Text(
+                'Checking your file…',
+                style: textTheme.bodyLarge?.copyWith(color: palette.secondaryText),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
