@@ -9,20 +9,20 @@ import java.io.File
  * one file. Wraps MediaMetadataRetriever for video and BitmapFactory/Exif
  * for images, per the plan's Phase 3. */
 class MediaProbe {
-    fun probe(filePath: String): Map<String, Any?> {
+    fun probe(filePath: String, cacheDir: File? = null): Map<String, Any?> {
         val file = File(filePath)
         if (!file.exists()) throw IllegalArgumentException("File not found: $filePath")
         val sizeBytes = file.length()
         val mime = guessMimeType(filePath)
 
         return if (mime?.startsWith("video/") == true) {
-            probeVideo(filePath, mime, sizeBytes)
+            probeVideo(filePath, mime, sizeBytes, cacheDir)
         } else {
             probeImage(filePath, mime, sizeBytes)
         }
     }
 
-    private fun probeVideo(filePath: String, mime: String, sizeBytes: Long): Map<String, Any?> {
+    private fun probeVideo(filePath: String, mime: String, sizeBytes: Long, cacheDir: File? = null): Map<String, Any?> {
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(filePath)
@@ -33,6 +33,23 @@ class MediaProbe {
             val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
             val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
             val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+
+            var thumbnailPath: String? = null
+            if (cacheDir != null) {
+                try {
+                    val frame = retriever.getFrameAtTime(1000000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: retriever.frameAtTime
+                    if (frame != null) {
+                        val thumbFile = File(cacheDir, "thumb_${File(filePath).name}_${System.currentTimeMillis()}.jpg")
+                        java.io.FileOutputStream(thumbFile).use { out ->
+                            frame.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
+                        }
+                        thumbnailPath = thumbFile.absolutePath
+                    }
+                } catch (_: Exception) {
+                    // Thumbnail extraction non-fatal
+                }
+            }
+
             return mapOf(
                 "type" to "video",
                 "mimeType" to mime,
@@ -41,6 +58,7 @@ class MediaProbe {
                 "durationMs" to durationMs,
                 "rotationDegrees" to rotation,
                 "sizeBytes" to sizeBytes,
+                "thumbnailPath" to thumbnailPath,
             )
         } finally {
             retriever.release()

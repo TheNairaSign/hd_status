@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -11,34 +12,74 @@ import 'package:path_provider/path_provider.dart';
 /// where every share-ready output needs to live regardless of which
 /// pipeline produced it.
 class ImageProcessor {
-  Future<String> optimize(String sourcePath, {int maxDimension = 1920, int quality = 90}) async {
-    final bytes = await File(sourcePath).readAsBytes();
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) {
-      throw const FormatException('Unreadable or unsupported image');
-    }
-
-    // Physically rotates pixels per the EXIF orientation tag, so the output
-    // doesn't depend on a viewer respecting that tag — and since we build a
-    // fresh JPEG below without copying the original exif block over, GPS and
-    // every other EXIF field is dropped in the same step.
-    var oriented = img.bakeOrientation(decoded);
-
-    final longestEdge = oriented.width > oriented.height ? oriented.width : oriented.height;
-    if (longestEdge > maxDimension) {
-      oriented = oriented.width >= oriented.height
-          ? img.copyResize(oriented, width: maxDimension)
-          : img.copyResize(oriented, height: maxDimension);
-    }
-
-    final jpgBytes = img.encodeJpg(oriented, quality: quality);
-
+  Future<String> optimize(String sourcePath, {int maxDimension = 1920, int quality = 95}) async {
+    // Path is resolved here (needs the path_provider plugin channel, which
+    // only works reliably on the root isolate) and handed to the isolate as
+    // a plain string — the actual decode/resize/encode below is pure Dart +
+    // dart:io, which is why it's safe to run via compute().
     final tempDir = await getTemporaryDirectory();
     final shareDir = Directory(p.join(tempDir.path, 'share'));
     if (!shareDir.existsSync()) shareDir.createSync(recursive: true);
-
     final outPath = p.join(shareDir.path, 'hd_status_${DateTime.now().millisecondsSinceEpoch}.jpg');
-    await File(outPath).writeAsBytes(jpgBytes);
-    return outPath;
+
+    return compute(
+      _processImage,
+      _ImageJob(sourcePath: sourcePath, outputPath: outPath, maxDimension: maxDimension, quality: quality),
+    );
   }
+}
+
+class _ImageJob {
+  const _ImageJob({
+    required this.sourcePath,
+    required this.outputPath,
+    required this.maxDimension,
+    required this.quality,
+  });
+
+  final String sourcePath;
+  final String outputPath;
+  final int maxDimension;
+  final int quality;
+}
+
+/// Runs on a background isolate via [compute]. Decoding a real phone photo
+/// (often 4000px+) into a raw pixel buffer, then box-filtering it down to
+/// 1920px, is real CPU/memory work — running it synchronously on the UI
+/// isolate froze the app's animations and risked Android's ANR watchdog on
+/// larger sources, which is what looked like a crash. Must be a top-level
+/// function (not a closure) for `compute` to hand it to another isolate.
+String _processImage(_ImageJob job) {
+  final bytes = File(job.sourcePath).readAsBytesSync();
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) {
+    throw const FormatException('Unreadable or unsupported image');
+  }
+
+  // Physically rotates pixels per the EXIF orientation tag, so the output
+  // doesn't depend on a viewer respecting that tag — and since we build a
+  // fresh JPEG below without copying the original exif block over, GPS and
+  // every other EXIF field is dropped in the same step.
+  var oriented = img.bakeOrientation(decoded);
+
+  final longestEdge = oriented.width > oriented.height ? oriented.width : oriented.height;
+  if (longestEdge > job.maxDimension) {
+    // `copyResize`'s default interpolation is nearest-neighbor, which
+    // aliases badly on a >2x downscale (a typical 12MP photo is ~4000px
+    // going to 1920px) — visibly worse than letting WhatsApp's own resize
+    // run on the untouched original. `average` box-filters source pixel
+    // blocks, the standard choice for significant downscaling.
+    oriented = oriented.width >= oriented.height
+        ? img.copyResize(oriented, width: job.maxDimension, interpolation: img.Interpolation.average)
+        : img.copyResize(oriented, height: job.maxDimension, interpolation: img.Interpolation.average);
+  }
+
+  // Quality raised from the Brief's ~90 starting point: since the resize
+  // above already does most of the size reduction, there's headroom to
+  // spend on quality instead of compounding two lossy passes (ours, then
+  // WhatsApp's) at a mediocre setting each — the goal is to hand WhatsApp
+  // the best source we can, not the smallest.
+  final jpgBytes = img.encodeJpg(oriented, quality: job.quality);
+  File(job.outputPath).writeAsBytesSync(jpgBytes);
+  return job.outputPath;
 }

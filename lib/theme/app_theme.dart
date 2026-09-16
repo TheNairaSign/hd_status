@@ -19,9 +19,10 @@ class AppColors {
   );
 
   static const dark = _Palette(
-    background: Color(0xFF121816),
-    card: Color(0xFF1C2622),
-    primary: Color(0xFF69D5AF),
+    background: Color(0xff141414),
+    card: Color(0xff212121),
+    // primary: Color(0xFF69D5AF),
+    primary: Color(0xFF3BB273),
     onPrimary: Color(0xFF121816),
     text: Color(0xFFF3F7F5),
     secondaryText: Color(0xFFADBDB4),

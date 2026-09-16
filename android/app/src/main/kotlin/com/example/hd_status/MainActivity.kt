@@ -34,6 +34,8 @@ class MainActivity : FlutterActivity() {
         val mediaProbe = MediaProbe()
         val videoEncoder = VideoEncoder(applicationContext)
 
+        val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_PROBE_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "probe" -> {
@@ -42,10 +44,17 @@ class MainActivity : FlutterActivity() {
                         result.error("bad_args", "filePath is required", null)
                         return@setMethodCallHandler
                     }
-                    try {
-                        result.success(mediaProbe.probe(filePath))
-                    } catch (e: Exception) {
-                        result.error("probe_failed", e.message, null)
+                    backgroundExecutor.execute {
+                        try {
+                            val probeResult = mediaProbe.probe(filePath, applicationContext.cacheDir)
+                            runOnUiThread {
+                                result.success(probeResult)
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                result.error("probe_failed", e.message, null)
+                            }
+                        }
                     }
                 }
                 else -> result.notImplemented()

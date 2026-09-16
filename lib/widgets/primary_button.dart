@@ -31,7 +31,13 @@ class PrimaryButton extends StatelessWidget {
           );
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(onPressed: onPressed, child: child),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          )
+        ),
+        onPressed: onPressed, child: child),
     );
   }
 }

@@ -13,6 +13,7 @@ class MediaInfo {
     required this.duration,
     required this.rotationDegrees,
     required this.sizeBytes,
+    this.thumbnailPath,
   });
 
   factory MediaInfo.fromProbeResult(
@@ -32,6 +33,7 @@ class MediaInfo {
       duration: durationMs == null ? null : Duration(milliseconds: durationMs),
       rotationDegrees: (raw['rotationDegrees'] as num?)?.toInt() ?? 0,
       sizeBytes: (raw['sizeBytes'] as num?)?.toInt() ?? 0,
+      thumbnailPath: raw['thumbnailPath'] as String?,
     );
   }
 
@@ -44,6 +46,7 @@ class MediaInfo {
   final Duration? duration;
   final int rotationDegrees;
   final int sizeBytes;
+  final String? thumbnailPath;
 
   /// Duration exceeds a single WhatsApp Status clip — needs the
   /// Long video → Splitting → Clips ready path instead of a single Optimize.
