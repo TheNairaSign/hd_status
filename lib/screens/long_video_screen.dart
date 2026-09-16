@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../engine/segment_planner.dart';
@@ -101,6 +102,7 @@ class _LongVideoScreenState extends State<LongVideoScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildMediaPreview(context),
               Text(
                 'This will become ${segments.length} clips',
                 style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
@@ -125,6 +127,78 @@ class _LongVideoScreenState extends State<LongVideoScreen> {
               PrimaryButton(label: 'Split into clips', onPressed: free > 0 || _isPro ? _split : null),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaPreview(BuildContext context) {
+    final palette = context.appPalette;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final info = widget.mediaInfo;
+    // Unused for video-only preview
+    final hasThumb = info.thumbnailPath != null && File(info.thumbnailPath!).existsSync();
+    return Container(
+      width: double.infinity,
+      height: 240,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C2622) : const Color(0xFFEFEFEF),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: palette.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (info.type == MediaType.video && hasThumb)
+              Image.file(
+                File(info.thumbnailPath!),
+                cacheWidth: 600,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _buildFallbackPlaceholder(context, info),
+              )
+            else
+              _buildFallbackPlaceholder(context, info),
+            if (info.type == MediaType.video)
+              Center(
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.5),
+                  ),
+                  child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 32),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFallbackPlaceholder(BuildContext context, MediaInfo info) {
+    final palette = context.appPalette;
+    final isVideo = info.type == MediaType.video;
+    return Container(
+      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(isVideo ? Icons.movie_outlined : Icons.image_outlined, size: 48, color: palette.secondaryText.withValues(alpha: 0.6)),
+            const SizedBox(height: 8),
+            Text(info.fileName, style: TextStyle(color: palette.secondaryText, fontSize: 13, fontWeight: FontWeight.w500)),
+          ],
         ),
       ),
     );

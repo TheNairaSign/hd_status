@@ -29,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isPro = false;
   int _videosRemaining = 3;
   bool _sharing = false;
+  bool _isPickingMedia = false;
 
   @override
   void initState() {
@@ -53,14 +54,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _chooseMedia() async {
-    final picked = await _picker.pickMedia();
-    if (picked == null || !mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SelectedMediaScreen(filePath: picked.path, fileName: picked.name),
-      ),
-    );
-    _refreshStatus();
+    if (_isPickingMedia) return;
+    setState(() => _isPickingMedia = true);
+    try {
+      final picked = await _picker.pickMedia();
+      if (picked == null || !mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SelectedMediaScreen(filePath: picked.path, fileName: picked.name),
+        ),
+      );
+      _refreshStatus();
+    } on PlatformException catch (_) {
+      // Ignore already_active or picker cancellation exceptions gracefully
+    } finally {
+      if (mounted) setState(() => _isPickingMedia = false);
+    }
   }
 
   Future<void> _goPro() async {
