@@ -1,6 +1,7 @@
 package com.example.hd_status
 
 import androidx.media3.common.util.UnstableApi
+import com.example.hd_status.media.ImageOptimizer
 import com.example.hd_status.media.MediaProbe
 import com.example.hd_status.media.StorageInfo
 import com.example.hd_status.media.VideoEncoder
@@ -16,6 +17,7 @@ private const val MEDIA_PROBE_CHANNEL = "com.example.hd_status/media_probe"
 private const val VIDEO_ENCODER_CHANNEL = "com.example.hd_status/video_encoder"
 private const val VIDEO_ENCODER_EVENTS = "com.example.hd_status/video_encoder_events"
 private const val STORAGE_CHANNEL = "com.example.hd_status/storage"
+private const val IMAGE_OPTIMIZER_CHANNEL = "com.example.hd_status/image_optimizer"
 
 //@OptIn(UnstableApi::class)
 class MainActivity : FlutterActivity() {
@@ -33,6 +35,7 @@ class MainActivity : FlutterActivity() {
         val sharer = WhatsAppStatusSharer(this)
         val mediaProbe = MediaProbe()
         val videoEncoder = VideoEncoder(applicationContext)
+        val imageOptimizer = ImageOptimizer()
 
         val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
 
@@ -170,6 +173,30 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "freeBytes" -> {
                     result.success(StorageInfo.freeBytes(applicationContext.cacheDir.path))
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, IMAGE_OPTIMIZER_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "optimize" -> {
+                    val inputPath = call.argument<String>("inputPath")
+                    val outputPath = call.argument<String>("outputPath")
+                    val maxDimension = call.argument<Int>("maxDimension") ?: 1920
+                    val quality = call.argument<Int>("quality") ?: 95
+                    if (inputPath == null || outputPath == null) {
+                        result.error("bad_args", "inputPath and outputPath are required", null)
+                        return@setMethodCallHandler
+                    }
+                    imageOptimizer.optimize(
+                        inputPath,
+                        outputPath,
+                        maxDimension,
+                        quality,
+                        onComplete = { result.success(it) },
+                        onError = { result.error("optimize_failed", it, null) },
+                    )
                 }
                 else -> result.notImplemented()
             }

@@ -42,8 +42,6 @@ dependencies:
   # App-private directories for temp/share outputs (Phase 2+)
   path_provider: ^2.1.4
   path: ^1.9.0
-  # Pure-Dart image resize/re-encode/EXIF strip (Phase 5)
-  image: ^4.2.0
   # Local quota ledger, entitlement cache, welcome-seen flag (Phase 1+)
   shared_preferences: ^2.3.2
   # DM Sans per the UX Guide's visual system
