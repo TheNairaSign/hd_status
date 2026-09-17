@@ -134,7 +134,7 @@ class _SelectedMediaScreenState extends State<SelectedMediaScreen> {
     if (info == null || plan == null) return;
 
     if (plan.action == EncodingAction.passthrough) {
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ResultScreen(
             output: ShareOutput(
@@ -165,7 +165,7 @@ class _SelectedMediaScreenState extends State<SelectedMediaScreen> {
     }
 
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => ProcessingScreen(mediaInfo: info, plan: plan)),
     );
   }
