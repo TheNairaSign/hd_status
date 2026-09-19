@@ -47,17 +47,17 @@ MediaInfo _image({
 void main() {
   final engine = OptimizationEngine();
 
-  test('already-compliant 1080p H.264 mp4 passes through', () {
-    final plan = engine.plan(_video(width: 1080, height: 1920));
+  test('already-compliant 480x848 H.264 mp4 passes through', () {
+    final plan = engine.plan(_video(width: 480, height: 848));
     expect(plan.action, EncodingAction.passthrough);
   });
 
   test('oversized 4K landscape video is re-encoded to fit the landscape box, preserving aspect ratio', () {
     final plan = engine.plan(_video(width: 3840, height: 2160));
     expect(plan.action, EncodingAction.reencode);
-    // 3840x2160 is 16:9 — fitting within 1920x1080 lands exactly on the box.
-    expect(plan.targetWidth, 1920);
-    expect(plan.targetHeight, 1080);
+    // 3840x2160 (16:9) fit within 848x480, width-limited, rounded to even.
+    expect(plan.targetWidth, 848);
+    expect(plan.targetHeight, 476);
   });
 
   test('portrait clip stored landscape with a 90 degree tag gets a portrait target, not a landscape one', () {
@@ -65,8 +65,8 @@ void main() {
     final plan = engine.plan(_video(width: 2756, height: 1268, rotationDegrees: 90));
     expect(plan.action, EncodingAction.reencode);
     expect(plan.targetHeight, greaterThan(plan.targetWidth));
-    expect(plan.targetHeight, 1920);
-    expect(plan.targetWidth, 882);
+    expect(plan.targetHeight, 848);
+    expect(plan.targetWidth, 390);
   });
 
   test('non-mp4 container is re-encoded even if dimensions already fit', () {

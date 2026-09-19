@@ -68,8 +68,12 @@ const int kSegmentTargetSizeMB = 12;
 class VideoEncodeProfile {
   const VideoEncodeProfile._();
 
-  static const int maxWidth = 1080;
-  static const int maxHeight = 1920;
+  // EXPERIMENT: three real clips (848/850 long edge, all resolutions and
+  // durations) show WhatsApp Status caps video at ~850 on the long edge and
+  // re-encodes anything above it, even a 4.8MB file. Sending at/below that
+  // ceiling tests whether WhatsApp then leaves our encode alone.
+  static const int maxWidth = 480;
+  static const int maxHeight = 848;
   static const int maxFps = 30;
   static const int audioKbps = 192;
 
