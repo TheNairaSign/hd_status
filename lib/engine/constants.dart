@@ -20,6 +20,10 @@ const int kMaxSourceSeconds = 30 * 60;
 /// Free-tier daily allowances (Product Brief, confirmed) / (this
 /// conversation's clip-cap decision, confirmed).
 const int kFreeVideosPerDay = 3;
+
+/// TESTING ONLY — set to false before release. When true the daily video
+/// cap never blocks or counts (clips are still capped).
+const bool kBypassVideoCapForTesting = true;
 const int kFreeClipsPerDay = 5;
 
 /// Largest file a Free user can select at all — confirmed decision, not a

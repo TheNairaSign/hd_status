@@ -13,7 +13,12 @@ enum QuotaKind { video, clip }
 /// no-login local ledger; the Brief itself accepts "some reinstall/clock
 /// abuse" as out of scope for the MVP's tamper resistance.
 class QuotaLedger {
-  QuotaLedger({SharedPreferences? prefs}) : _prefsOverride = prefs;
+  QuotaLedger({SharedPreferences? prefs, this.bypassVideoCap = kBypassVideoCapForTesting})
+      : _prefsOverride = prefs;
+
+  final bool bypassVideoCap;
+
+  bool _bypassed(QuotaKind kind) => bypassVideoCap && kind == QuotaKind.video;
 
   final SharedPreferences? _prefsOverride;
 
@@ -57,6 +62,7 @@ class QuotaLedger {
   /// double-spent by a concurrent action. Returns false (reserving nothing)
   /// if fewer than [count] slots remain.
   Future<bool> reserve(QuotaKind kind, {int count = 1}) async {
+    if (_bypassed(kind)) return true;
     final prefs = await _prefs;
     await _rolloverIfNeeded(prefs);
     final remaining = await remainingToday(kind);
@@ -69,6 +75,7 @@ class QuotaLedger {
   /// Converts a reservation into a real usage count — call only after the
   /// job's output has been validated as successful.
   Future<void> commit(QuotaKind kind, {int count = 1}) async {
+    if (_bypassed(kind)) return;
     final prefs = await _prefs;
     final reserved = prefs.getInt(_reservedKey(kind)) ?? 0;
     final used = prefs.getInt(_usedKey(kind)) ?? 0;
@@ -78,6 +85,7 @@ class QuotaLedger {
 
   /// Releases a reservation without consuming it — call on cancel or failure.
   Future<void> release(QuotaKind kind, {int count = 1}) async {
+    if (_bypassed(kind)) return;
     final prefs = await _prefs;
     final reserved = prefs.getInt(_reservedKey(kind)) ?? 0;
     await prefs.setInt(_reservedKey(kind), (reserved - count).clamp(0, kFreeVideosPerDay + kFreeClipsPerDay));
