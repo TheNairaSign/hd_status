@@ -427,7 +427,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Clips longer than 1:30 become consecutive Status clips',
+                              'Videos longer than ${kSegmentSeconds}s become consecutive Status clips',
                               style: textTheme.bodySmall?.copyWith(
                                 color: palette.secondaryText,
                                 fontSize: 13,

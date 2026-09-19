@@ -39,7 +39,8 @@ class VideoEncoderChannel {
 
   /// [targetWidth]/[targetHeight] 0 means no resize. [targetVideoKbps] <= 0
   /// means let the platform encoder pick its own default bitrate for the
-  /// resolution instead of requesting one explicitly. [startMs]/[endMs] -1
+  /// resolution instead of requesting one explicitly; [audioKbps] <= 0 keeps
+  /// the encoder's default audio bitrate. [startMs]/[endMs] -1
   /// means no trim (the whole file) — non-default values are how the
   /// segment splitter (Phase 6) cuts one clip per encode pass.
   ///
@@ -52,6 +53,7 @@ class VideoEncoderChannel {
     int targetWidth = 0,
     int targetHeight = 0,
     int targetVideoKbps = 0,
+    int audioKbps = 0,
     int startMs = -1,
     int endMs = -1,
   }) {
@@ -61,6 +63,7 @@ class VideoEncoderChannel {
       'targetWidth': targetWidth,
       'targetHeight': targetHeight,
       'targetVideoKbps': targetVideoKbps,
+      'audioKbps': audioKbps,
       'startMs': startMs,
       'endMs': endMs,
     });

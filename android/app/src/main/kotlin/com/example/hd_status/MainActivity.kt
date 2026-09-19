@@ -126,6 +126,7 @@ class MainActivity : FlutterActivity() {
                     val targetWidth = call.argument<Int>("targetWidth") ?: 0
                     val targetHeight = call.argument<Int>("targetHeight") ?: 0
                     val targetVideoKbps = call.argument<Int>("targetVideoKbps") ?: 0
+                    val audioKbps = call.argument<Int>("audioKbps") ?: 0
                     val startMs = (call.argument<Number>("startMs") ?: -1).toLong()
                     val endMs = (call.argument<Number>("endMs") ?: -1).toLong()
                     if (inputPath == null || outputPath == null) {
@@ -138,6 +139,7 @@ class MainActivity : FlutterActivity() {
                         targetWidth,
                         targetHeight,
                         targetVideoKbps,
+                        audioKbps,
                         startMs,
                         endMs,
                         object : VideoEncoder.Listener {

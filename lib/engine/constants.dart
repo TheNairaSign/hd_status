@@ -4,9 +4,14 @@
 /// rather than inlined so validating them later is a one-place change.
 library;
 
-/// WhatsApp's current Status per-clip duration cap. Taken from the design
-/// prototype (SEGMENT_SEC), NOT independently verified.
-const int kSegmentSeconds = 90;
+/// Length of each split clip. Deliberately SHORTER than WhatsApp's Status
+/// cap (90s in the design prototype, NOT independently verified): for a
+/// fixed per-clip size budget ([kSegmentTargetSizeMB]), halving or thirding
+/// the duration lets the video and audio bitrates go up instead of just
+/// banking the savings — 30s at 12MB gives ~3008 kbps video + 192 kbps
+/// audio vs. 90s's ~938 kbps + 128 kbps. Trade-off: 3x as many clips per
+/// source (more taps, and a free user's daily clip cap covers less footage).
+const int kSegmentSeconds = 30;
 
 /// Longest source video this app will attempt to split. Videos over this
 /// show a blocking "too long to prepare yet" state instead of splitting.
@@ -46,13 +51,12 @@ const int kImageMaxDimension = 2200;
 
 /// Our own re-encode's target OUTPUT size per segment — deliberately well
 /// under [VideoEncodeProfile.maxSizeBytes] (WhatsApp's actual passthrough
-/// ceiling), not equal to it. The old fixed 1200kbps target landed at
+/// ceiling), not equal to it. The old fixed 1200kbps target at 90s landed at
 /// (1200+128)kbps × 90s / 8 ≈ 14.9MB — only a ~7% margin below the 16MB
 /// cliff, with no room for VBR overshoot on a busy scene. 12MB restores a
 /// real safety margin (matches the SPIT/IEEE paper's empirically-safe
-/// zone), at the cost of a lower video bitrate than before. Video bitrate
-/// is DERIVED from this + segment duration (below), not hardcoded, so it
-/// stays correct if segment length ever changes.
+/// zone). Video bitrate is DERIVED from this + segment duration (below),
+/// not hardcoded, so it stays correct if segment length ever changes.
 const int kSegmentTargetSizeMB = 12;
 
 /// Video encode target profile — placeholder MVP values (Product Brief §8-style
@@ -63,13 +67,13 @@ class VideoEncodeProfile {
   static const int maxWidth = 1080;
   static const int maxHeight = 1920;
   static const int maxFps = 30;
-  static const int audioKbps = 128;
+  static const int audioKbps = 192;
 
   /// video_bitrate_kbps = (target_size_MB × 8000 / duration_s) − audio_kbps.
   /// Size-target-driven, not a hand-picked number — see
-  /// [kSegmentTargetSizeMB]. At the current 12MB/90s/128kbps inputs this
-  /// works out to ~938 kbps (down from the old fixed 1200 kbps), trading
-  /// bitrate for headroom below WhatsApp's 16MB passthrough ceiling.
+  /// [kSegmentTargetSizeMB]. At the current 12MB/30s/192kbps inputs this
+  /// works out to ~3008 kbps (up from the old fixed 1200 kbps at 90s), with
+  /// ~4MB of headroom below WhatsApp's 16MB passthrough ceiling.
   static const int targetVideoKbps = (kSegmentTargetSizeMB * 8000 ~/ kSegmentSeconds) - audioKbps;
 
   static const int maxSizeBytes = 16 * 1024 * 1024; // WhatsApp's practical media ceiling — passthrough gate, distinct from our own encode target above

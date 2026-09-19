@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../engine/constants.dart';
 import '../channels/video_encoder_channel.dart';
 import '../models/encoding_plan.dart';
 import '../models/media_info.dart';
@@ -137,6 +138,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> with SingleTickerPr
       targetWidth: widget.plan.targetWidth,
       targetHeight: widget.plan.targetHeight,
       targetVideoKbps: widget.plan.targetVideoKbps,
+      audioKbps: widget.plan.targetVideoKbps > 0 ? VideoEncodeProfile.audioKbps : 0,
     );
   }
 

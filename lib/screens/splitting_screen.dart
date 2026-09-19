@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../engine/constants.dart';
 import '../channels/video_encoder_channel.dart';
 import '../engine/optimization_engine.dart';
 import '../models/media_info.dart';
@@ -101,6 +102,7 @@ class _SplittingScreenState extends State<SplittingScreen> {
         targetWidth: plan.targetWidth,
         targetHeight: plan.targetHeight,
         targetVideoKbps: plan.targetVideoKbps,
+        audioKbps: plan.targetVideoKbps > 0 ? VideoEncodeProfile.audioKbps : 0,
         startMs: segment.start.inMilliseconds,
         endMs: segment.end.inMilliseconds,
       );

@@ -28,9 +28,11 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.Effect
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Presentation
+import androidx.media3.transformer.Codec
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.DefaultEncoderFactory
 import androidx.media3.transformer.EditedMediaItem
@@ -65,6 +67,9 @@ class VideoEncoder(private val context: Context) {
      * @param targetVideoKbps requested average video bitrate in kbps; <= 0
      *   means "let the platform encoder pick its own default for the
      *   resolution" instead of requesting one explicitly.
+     * @param audioKbps requested AAC bitrate in kbps; <= 0 keeps Media3's
+     *   hardcoded 128 kbps default (1.4.1 has no public audio-settings API,
+     *   so this is applied via [AudioBitrateEncoderFactory]).
      * @param startMs/endMs clip trim in milliseconds; -1/-1 means the whole
      *   file (used by the segment splitter in Phase 6 to cut one segment
      *   per encode pass instead of a separate split-then-reencode step).
@@ -75,6 +80,7 @@ class VideoEncoder(private val context: Context) {
         targetWidth: Int,
         targetHeight: Int,
         targetVideoKbps: Int,
+        audioKbps: Int,
         startMs: Long,
         endMs: Long,
         listener: Listener,
@@ -121,19 +127,23 @@ class VideoEncoder(private val context: Context) {
                 }
             })
 
-        if (targetVideoKbps > 0) {
+        if (targetVideoKbps > 0 || audioKbps > 0) {
             // Average-bitrate VBR against the Dart-computed budget — see the
             // plan's "Video compression algorithm" section for why this is
             // the bitrate-budget approach rather than CRF (MediaCodec's
             // hardware encoders don't expose CRF the way x264 does).
-            val encoderFactory = DefaultEncoderFactory.Builder(context)
-                .setRequestedVideoEncoderSettings(
+            val defaultFactoryBuilder = DefaultEncoderFactory.Builder(context)
+            if (targetVideoKbps > 0) {
+                defaultFactoryBuilder.setRequestedVideoEncoderSettings(
                     VideoEncoderSettings.Builder()
                         .setBitrate(targetVideoKbps * 1000)
                         .build(),
                 )
-                .build()
-            transformerBuilder.setEncoderFactory(encoderFactory)
+            }
+            val defaultFactory = defaultFactoryBuilder.build()
+            transformerBuilder.setEncoderFactory(
+                if (audioKbps > 0) AudioBitrateEncoderFactory(defaultFactory, audioKbps * 1000) else defaultFactory,
+            )
         }
 
         val t = transformerBuilder.build()
@@ -167,4 +177,18 @@ class VideoEncoder(private val context: Context) {
         progressRunnable?.let { handler.removeCallbacks(it) }
         progressRunnable = null
     }
+}
+
+/**
+ * media3-transformer 1.4.1's DefaultEncoderFactory hardcodes audio at
+ * 128 kbps whenever the requested Format has no bitrate; this wrapper
+ * supplies one. Newer Media3 versions expose this via AudioEncoderSettings.
+ */
+@UnstableApi
+private class AudioBitrateEncoderFactory(
+    private val delegate: Codec.EncoderFactory,
+    private val audioBitrate: Int,
+) : Codec.EncoderFactory by delegate {
+    override fun createForAudioEncoding(format: Format): Codec =
+        delegate.createForAudioEncoding(format.buildUpon().setAverageBitrate(audioBitrate).build())
 }
