@@ -10,6 +10,7 @@ MediaInfo _video({
   String mimeType = 'video/mp4',
   int sizeBytes = 5 * 1024 * 1024,
   int durationSeconds = 30,
+  int rotationDegrees = 0,
 }) {
   return MediaInfo(
     filePath: '/tmp/in.mp4',
@@ -19,7 +20,7 @@ MediaInfo _video({
     width: width,
     height: height,
     duration: Duration(seconds: durationSeconds),
-    rotationDegrees: 0,
+    rotationDegrees: rotationDegrees,
     sizeBytes: sizeBytes,
   );
 }
@@ -57,6 +58,15 @@ void main() {
     // 3840x2160 is 16:9 — fitting within 1920x1080 lands exactly on the box.
     expect(plan.targetWidth, 1920);
     expect(plan.targetHeight, 1080);
+  });
+
+  test('portrait clip stored landscape with a 90 degree tag gets a portrait target, not a landscape one', () {
+    // Real test clip: displays 1268x2756 but is stored 2756x1268 + rotation 90.
+    final plan = engine.plan(_video(width: 2756, height: 1268, rotationDegrees: 90));
+    expect(plan.action, EncodingAction.reencode);
+    expect(plan.targetHeight, greaterThan(plan.targetWidth));
+    expect(plan.targetHeight, 1920);
+    expect(plan.targetWidth, 882);
   });
 
   test('non-mp4 container is re-encoded even if dimensions already fit', () {
