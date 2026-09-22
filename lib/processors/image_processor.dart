@@ -7,12 +7,18 @@ import 'package:path_provider/path_provider.dart';
 
 import '../engine/constants.dart';
 
-/// Downscale, re-encode, strip GPS EXIF, bake in orientation — the pure-Dart
-/// image half of the pipeline (Product Brief: images stay in Dart, video
-/// stays native). Writes into `<cacheDir>/share/`, the one directory exposed
-/// through the Android FileProvider (file_provider_paths.xml), since that's
-/// where every share-ready output needs to live regardless of which
-/// pipeline produced it.
+/// Upscale-if-needed, re-encode, strip GPS EXIF, bake in orientation — the
+/// pure-Dart image half of the pipeline (Product Brief: images stay in
+/// Dart, video stays native). Writes into `<cacheDir>/share/`, the one
+/// directory exposed through the Android FileProvider
+/// (file_provider_paths.xml), since that's where every share-ready output
+/// needs to live regardless of which pipeline produced it.
+///
+/// Never downscales: WhatsApp recompresses whatever it receives regardless
+/// of our output size, so shrinking below [_ImageJob.maxDimension] only
+/// throws away detail WhatsApp's own pass could have used, for no benefit.
+/// A source already at or above that floor is left at its native
+/// resolution; one below it is upscaled up to the floor instead.
 class ImageProcessor {
   Future<String> optimize(String sourcePath, {int maxDimension = kImageMaxDimension, int quality = 97}) async {
     // Path is resolved here (needs the path_provider plugin channel, which
@@ -66,15 +72,14 @@ String _processImage(_ImageJob job) {
   var oriented = img.bakeOrientation(decoded);
 
   final longestEdge = oriented.width > oriented.height ? oriented.width : oriented.height;
-  if (longestEdge > job.maxDimension) {
-    // `copyResize`'s default interpolation is nearest-neighbor, which
-    // aliases badly on a significant downscale — visibly worse than
-    // letting WhatsApp's own resize run on the untouched original.
-    // `average` box-filters source pixel blocks, the standard choice for
-    // significant downscaling.
+  if (longestEdge < job.maxDimension) {
+    // `cubic` is the best upsampling filter this package offers (no true
+    // Lanczos available) — `average`'s box filter is for downscaling and
+    // would just blur an upscale; nearest-neighbor (the `copyResize`
+    // default) would look blocky.
     oriented = oriented.width >= oriented.height
-        ? img.copyResize(oriented, width: job.maxDimension, interpolation: img.Interpolation.average)
-        : img.copyResize(oriented, height: job.maxDimension, interpolation: img.Interpolation.average);
+        ? img.copyResize(oriented, width: job.maxDimension, interpolation: img.Interpolation.cubic)
+        : img.copyResize(oriented, height: job.maxDimension, interpolation: img.Interpolation.cubic);
   }
 
   // Quality raised from the Brief's ~90 starting point: since the resize
