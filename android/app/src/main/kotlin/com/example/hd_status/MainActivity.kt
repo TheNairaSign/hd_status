@@ -85,6 +85,24 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
+                "shareToChat" -> {
+                    val filePath = call.argument<String>("filePath")
+                    val fileName = call.argument<String>("fileName")
+                    val mimeType = call.argument<String>("mimeType")
+                    val targetPackage = call.argument<String>("targetPackage")
+                    if (filePath == null || fileName == null || mimeType == null || targetPackage == null) {
+                        result.error("bad_args", "filePath, fileName, mimeType and targetPackage are required", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val staged = ShareFileStaging.stageForShare(applicationContext, filePath, fileName)
+                        val attempted = sharer.shareToChat(staged, mimeType, targetPackage)
+                        result.success(attempted)
+                    } catch (e: Exception) {
+                        result.error("share_failed", e.message, null)
+                    }
+                }
+
                 "shareGeneric" -> {
                     val filePath = call.argument<String>("filePath")
                     val fileName = call.argument<String>("fileName")

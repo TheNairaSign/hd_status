@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../channels/whatsapp_status_channel.dart';
+import 'whatsapp_package_picker.dart';
 
 /// Resolves which WhatsApp package to target (per UX Guide S07: prompt when
 /// both are installed) and falls back to the generic Android share sheet
@@ -31,7 +32,7 @@ class StatusShareService {
       target = installed.first;
     } else {
       if (!context.mounted) return;
-      final chosen = await _pickWhichWhatsApp(context);
+      final chosen = await pickWhichWhatsApp(context);
       if (chosen == null) return;
       target = chosen;
     }
@@ -50,26 +51,5 @@ class StatusShareService {
       );
       await _channel.shareGeneric(filePath: filePath, fileName: fileName, mimeType: mimeType);
     }
-  }
-
-  Future<String?> _pickWhichWhatsApp(BuildContext context) {
-    return showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('WhatsApp'),
-              onTap: () => Navigator.pop(ctx, WhatsAppPackage.consumer),
-            ),
-            ListTile(
-              title: const Text('WhatsApp Business'),
-              onTap: () => Navigator.pop(ctx, WhatsAppPackage.business),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

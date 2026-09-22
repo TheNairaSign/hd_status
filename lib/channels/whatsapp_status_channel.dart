@@ -39,6 +39,26 @@ class WhatsAppStatusChannel {
     return attempted ?? false;
   }
 
+  /// Opens WhatsApp's chat compose screen (contact picker, file attached)
+  /// instead of the Status deep-link — see `shareToChat` in
+  /// WhatsAppStatusSharer.kt for why: the HD-quality toggle only exists on
+  /// this surface, not on the Status one. Returns false if the launch
+  /// itself failed, same contract as [shareToStatus].
+  Future<bool> shareToChat({
+    required String filePath,
+    required String fileName,
+    required String mimeType,
+    required String targetPackage,
+  }) async {
+    final attempted = await _channel.invokeMethod<bool>('shareToChat', {
+      'filePath': filePath,
+      'fileName': fileName,
+      'mimeType': mimeType,
+      'targetPackage': targetPackage,
+    });
+    return attempted ?? false;
+  }
+
   /// Generic Android share sheet — always available fallback.
   Future<void> shareGeneric({
     required String filePath,

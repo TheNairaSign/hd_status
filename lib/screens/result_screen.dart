@@ -6,10 +6,12 @@ import 'package:gal/gal.dart';
 import '../channels/media_probe_channel.dart';
 import '../models/media_info.dart';
 import '../models/share_output.dart';
+import '../services/hd_chat_share_service.dart';
 import '../services/quota_ledger.dart';
 import '../services/status_share_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
+import 'hd_chat_instructions_sheet.dart';
 
 /// S06 Result. Displays media preview for the processed output,
 /// updated quota allowance, and options to share or save to device.
@@ -24,8 +26,10 @@ class ResultScreen extends StatefulWidget {
 
 class _ResultScreenState extends State<ResultScreen> {
   final _shareService = StatusShareService();
+  final _hdChatShareService = HdChatShareService();
   final _ledger = QuotaLedger();
   bool _busy = false;
+  bool _hdChatAvailable = false;
   int? _videosRemaining;
   MediaInfo? _probedInfo;
 
@@ -40,6 +44,8 @@ class _ResultScreenState extends State<ResultScreen> {
       final remaining = await _ledger.remainingToday(QuotaKind.video);
       if (mounted) setState(() => _videosRemaining = remaining);
     }
+    final hdChatAvailable = await _hdChatShareService.isAvailable();
+    if (mounted) setState(() => _hdChatAvailable = hdChatAvailable);
     try {
       final info = await MediaProbeChannel().probe(widget.output.filePath, widget.output.fileName);
       if (mounted) setState(() => _probedInfo = info);
@@ -52,6 +58,28 @@ class _ResultScreenState extends State<ResultScreen> {
     setState(() => _busy = true);
     try {
       await _shareService.share(
+        context,
+        filePath: widget.output.filePath,
+        fileName: widget.output.fileName,
+        mimeType: widget.output.mimeType,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openHdChatFlow() async {
+    final choice = await showHdChatInstructionsSheet(context);
+    if (choice == null || !mounted) return;
+
+    if (choice == 'use_normal_share') {
+      await _share();
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      await _hdChatShareService.sendToChat(
         context,
         filePath: widget.output.filePath,
         fileName: widget.output.fileName,
@@ -119,6 +147,13 @@ class _ResultScreenState extends State<ResultScreen> {
               ),
               const SizedBox(height: AppSpacing.sm),
               SecondaryButton(label: 'Save to device', onPressed: _busy ? null : _save),
+              if (_hdChatAvailable) ...[
+                const SizedBox(height: AppSpacing.sm),
+                SecondaryButton(
+                  label: 'Higher quality (via HD chat)',
+                  onPressed: _busy ? null : _openHdChatFlow,
+                ),
+              ],
 
               if (output.isVideo && _videosRemaining != null) ...[
                 const SizedBox(height: AppSpacing.md),

@@ -95,6 +95,35 @@ class WhatsAppStatusSharer(private val context: Context) {
         context.startActivity(Intent.createChooser(intent, null))
     }
 
+    /**
+     * Opens WhatsApp's ordinary chat compose screen with the file attached
+     * (contact picker, no target conversation) instead of the Status
+     * deep-link — the HD-quality toggle in [shareToStatus]'s "SHARE_TO_STATUS"
+     * surface isn't available, per WhatsApp's own docs, only in chat. The
+     * caller is responsible for instructing the user to pick a chat, tap
+     * HD, then forward the sent message to Status themselves — nothing
+     * about that sequence can be automated from here.
+     *
+     * @return true if a launch was attempted without an immediate
+     *   [ActivityNotFoundException]; false means the caller should fall
+     *   back to [shareGeneric].
+     */
+    fun shareToChat(filePath: String, mimeType: String, targetPackage: String): Boolean {
+        val mediaUri = uriFor(filePath)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = mimeType
+            putExtra(Intent.EXTRA_STREAM, mediaUri)
+            setPackage(targetPackage)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return try {
+            context.startActivity(intent)
+            true
+        } catch (e: ActivityNotFoundException) {
+            false
+        }
+    }
+
     private fun uriFor(filePath: String): Uri {
         val authority = "${context.packageName}.fileprovider"
         return FileProvider.getUriForFile(context, authority, File(filePath))
