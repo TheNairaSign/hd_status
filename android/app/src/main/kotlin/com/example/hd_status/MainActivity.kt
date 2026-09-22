@@ -1,6 +1,7 @@
 package com.example.hd_status
 
 import androidx.media3.common.util.UnstableApi
+import com.example.hd_status.media.FilmstripExtractor
 import com.example.hd_status.media.MediaProbe
 import com.example.hd_status.media.StorageInfo
 import com.example.hd_status.media.VideoEncoder
@@ -53,6 +54,26 @@ class MainActivity : FlutterActivity() {
                         } catch (e: Exception) {
                             runOnUiThread {
                                 result.error("probe_failed", e.message, null)
+                            }
+                        }
+                    }
+                }
+                "filmstrip" -> {
+                    val filePath = call.argument<String>("filePath")
+                    val frameCount = call.argument<Int>("frameCount") ?: 0
+                    if (filePath == null) {
+                        result.error("bad_args", "filePath is required", null)
+                        return@setMethodCallHandler
+                    }
+                    backgroundExecutor.execute {
+                        try {
+                            val frames = FilmstripExtractor.extractFrames(filePath, applicationContext.cacheDir, frameCount)
+                            runOnUiThread {
+                                result.success(frames)
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                result.error("filmstrip_failed", e.message, null)
                             }
                         }
                     }

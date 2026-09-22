@@ -23,4 +23,20 @@ class MediaProbeChannel {
       throw MediaProbeException(e.message ?? 'Unreadable file');
     }
   }
+
+  /// Real frames sampled evenly across the video, for ManualSplitScreen's
+  /// timeline strip. Best-effort — returns fewer than [frameCount] (or none)
+  /// on a corrupt/unreadable source rather than throwing, since a missing
+  /// filmstrip shouldn't block the trim UI from working.
+  Future<List<String>> filmstrip({required String filePath, required int frameCount}) async {
+    try {
+      final result = await _channel.invokeMethod<List<Object?>>('filmstrip', {
+        'filePath': filePath,
+        'frameCount': frameCount,
+      });
+      return (result ?? const []).cast<String>();
+    } on PlatformException {
+      return const [];
+    }
+  }
 }
