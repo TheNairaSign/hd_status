@@ -50,6 +50,7 @@ dependencies:
   google_fonts: ^8.2.1
   # "Save to device" on Result/Clips ready (Phase 5+)
   gal: ^2.3.0
+  video_player: ^2.14.0
 
 dev_dependencies:
   flutter_test:

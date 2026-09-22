@@ -9,6 +9,7 @@ import '../services/quota_ledger.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
 import 'daily_limit_sheet.dart';
+import 'manual_split_screen.dart';
 import 'paywall_screen.dart';
 import 'splitting_screen.dart';
 
@@ -80,6 +81,12 @@ class _LongVideoScreenState extends State<LongVideoScreen> {
     );
   }
 
+  void _chooseManually() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ManualSplitScreen(mediaInfo: widget.mediaInfo)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.appPalette;
@@ -124,7 +131,15 @@ class _LongVideoScreenState extends State<LongVideoScreen> {
                   ),
               ],
               const Spacer(),
-              PrimaryButton(label: 'Split into clips', onPressed: free > 0 || _isPro ? _split : null),
+              PrimaryButton(
+                label: 'Split automatically into ${segments.length} clips',
+                onPressed: free > 0 || _isPro ? _split : null,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SecondaryButton(
+                label: 'Choose a clip manually',
+                onPressed: free > 0 || _isPro ? _chooseManually : null,
+              ),
             ],
           ),
         ),
