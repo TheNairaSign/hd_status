@@ -66,8 +66,17 @@ class OptimizationEngine {
   }
 
   EncodingPlan _planVideo(MediaInfo info) {
-    final srcW = info.width ?? 0;
-    final srcH = info.height ?? 0;
+    // The probe reports STORED dimensions plus a separate rotation flag
+    // (phone-recorded portrait video is often stored landscape with a 90/270
+    // tag). Media3 rotates frames upright before our Presentation effect
+    // runs, so the target box must be chosen from the DISPLAY orientation —
+    // otherwise a portrait clip gets a landscape target (or, since this
+    // engine now upscales, gets upscaled/re-encoded in the wrong axis
+    // entirely, which is what a rotation-unaware version of this function
+    // did on a real 720x1280 test clip).
+    final swapAxes = info.rotationDegrees % 180 != 0;
+    final srcW = (swapAxes ? info.height : info.width) ?? 0;
+    final srcH = (swapAxes ? info.width : info.height) ?? 0;
     if (srcW <= 0 || srcH <= 0) {
       // Missing dimensions — can't reason about fit, so re-encode defensively.
       return const EncodingPlan(

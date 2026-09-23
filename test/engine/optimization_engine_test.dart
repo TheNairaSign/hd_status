@@ -10,6 +10,7 @@ MediaInfo _video({
   String mimeType = 'video/mp4',
   int sizeBytes = 5 * 1024 * 1024,
   int durationSeconds = 30,
+  int rotationDegrees = 0,
 }) {
   return MediaInfo(
     filePath: '/tmp/in.mp4',
@@ -19,7 +20,7 @@ MediaInfo _video({
     width: width,
     height: height,
     duration: Duration(seconds: durationSeconds),
-    rotationDegrees: 0,
+    rotationDegrees: rotationDegrees,
     sizeBytes: sizeBytes,
   );
 }
@@ -78,6 +79,17 @@ void main() {
     // by width leaves height comfortably above the floor too.
     expect(plan.targetWidth, greaterThanOrEqualTo(1920));
     expect(plan.targetHeight, greaterThanOrEqualTo(1080));
+  });
+
+  test('portrait clip stored landscape with a 90 degree tag is upscaled on the DISPLAY axis, not the stored one', () {
+    // Real test clip: displays 720x1280 (portrait) but the probe reports it
+    // stored as 1280x720 (landscape) + rotation 90 — the exact case that
+    // silently produced a sideways, wrong-axis output before this test.
+    final plan = engine.plan(_video(width: 1280, height: 720, rotationDegrees: 90));
+    expect(plan.action, EncodingAction.reencode);
+    expect(plan.targetHeight, greaterThan(plan.targetWidth));
+    expect(plan.targetWidth, 1080);
+    expect(plan.targetHeight, 1920);
   });
 
   test('image already at or above the quality floor passes through untouched', () {
