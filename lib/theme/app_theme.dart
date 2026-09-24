@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// Deep teal / soft mint / warm-neutral palette, from the UX Guide's
 /// color scheme table. Values are fixed per theme, not derived, so they
@@ -88,10 +87,16 @@ class AppTheme {
       onSurface: p.text,
     );
 
-    final textTheme = GoogleFonts.dmSansTextTheme().apply(
-      bodyColor: p.text,
-      displayColor: p.text,
-    );
+    // Bundled locally (assets/fonts, declared in pubspec.yaml) instead of
+    // google_fonts, which fetches the family over the network on first use —
+    // this app is otherwise fully on-device (Product Brief architecture).
+    // Only Regular (400), Bold (700) and Italic (400) are bundled, so any
+    // requested weight in between (e.g. w500/w600, used for emphasis below)
+    // snaps to Regular or Bold — no intermediate weight files exist to
+    // render exactly.
+    final textTheme = Typography.material2021(platform: TargetPlatform.android)
+        .black
+        .apply(fontFamily: 'DM Sans', bodyColor: p.text, displayColor: p.text);
 
     return ThemeData(
       useMaterial3: true,

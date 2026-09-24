@@ -46,8 +46,6 @@ dependencies:
   image: ^4.2.0
   # Local quota ledger, entitlement cache, welcome-seen flag (Phase 1+)
   shared_preferences: ^2.3.2
-  # DM Sans per the UX Guide's visual system
-  google_fonts: ^8.2.1
   # "Save to device" on Result/Clips ready (Phase 5+)
   gal: ^2.3.0
   video_player: ^2.14.0
@@ -76,6 +74,15 @@ flutter:
 
   assets:
     - assets/images/
+
+  fonts:
+    - family: DM Sans
+      fonts:
+        - asset: assets/fonts/DMSans-Regular.ttf
+        - asset: assets/fonts/DMSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/DMSans-Italic.ttf
+          style: italic
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
