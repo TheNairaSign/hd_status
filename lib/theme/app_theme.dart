@@ -90,10 +90,9 @@ class AppTheme {
     // Bundled locally (assets/fonts, declared in pubspec.yaml) instead of
     // google_fonts, which fetches the family over the network on first use —
     // this app is otherwise fully on-device (Product Brief architecture).
-    // Only Regular (400), Bold (700) and Italic (400) are bundled, so any
-    // requested weight in between (e.g. w500/w600, used for emphasis below)
-    // snaps to Regular or Bold — no intermediate weight files exist to
-    // render exactly.
+    // Regular/Medium/SemiBold/Bold (400/500/600/700) and Italic are all
+    // bundled, so every weight used in this theme renders as its own file,
+    // not a nearest-match substitute.
     final textTheme = Typography.material2021(platform: TargetPlatform.android)
         .black
         .apply(fontFamily: 'DM Sans', bodyColor: p.text, displayColor: p.text);
